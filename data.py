@@ -8,6 +8,8 @@ def get_dataset():
     train_set, valid_set, test_set = cPickle.load(f)
     f.close()
 
+    return train_set, valid_set, test_set
+
 def shared_dataset(data_xy):
     """ Function that loads the dataset into shared variables
 
