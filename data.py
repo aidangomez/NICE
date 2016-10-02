@@ -1,12 +1,16 @@
-import cPickle
+import pickle
 import gzip
 import numpy
+import theano
 
 
 def get_dataset():
     f = gzip.open('mnist.pkl.gz', 'rb')
-    train_set, valid_set, test_set = cPickle.load(f)
+    u = pickle._Unpickler(f)
+    u.encoding = 'latin1'
+    train_set, valid_set, test_set = u.load()
     f.close()
+    print(train_set[0].shape, train_set[1].shape)
 
     return train_set, valid_set, test_set
 
@@ -29,7 +33,26 @@ def shared_dataset(data_xy):
     # floats it doesn't make sense) therefore instead of returning
     # ``shared_y`` we will have to cast it to int. This little hack
     # lets us get around this issue
-    return shared_x, T.cast(shared_y, 'int32')
+    return shared_x, theano.tensor.cast(shared_y, 'int32')
 
 def partition_data(data):
-    return data[0::2], data[1::2]
+    return data[:, 0::2], data[:, 1::2]
+
+def get_minibatches_idx(n, minibatch_size, shuffle=True):
+    idx_list = numpy.arange(n, dtype="int32")
+
+    if shuffle:
+        numpy.random.shuffle(idx_list)
+
+    minibatches = []
+    minibatch_start = 0
+    for i in range(n // minibatch_size):
+        minibatches.append(idx_list[minibatch_start:
+                                    minibatch_start + minibatch_size])
+        minibatch_start += minibatch_size
+
+    if (minibatch_start != n):
+        # Make a minibatch out of what is left
+        minibatches.append(idx_list[minibatch_start:])
+
+    return zip(range(len(minibatches)), minibatches)
