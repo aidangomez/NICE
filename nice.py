@@ -99,9 +99,12 @@ class ReLUMLPLayer:
         return theano.tensor.nnet.relu(ip)
 
 
+def log_prob(output):
+    return -(np.log(1 + np.exp(output)) + np.log(1 + np.exp(-output))).sum()
+
 def log_loss(output, s):
-    component_loss = -(np.log(1 + np.exp(output)) + np.log(1 + np.exp(-output)))
-    return -component_loss.sum() -  s.sum()
+    log_prob_val = log_prob(output)
+    return -log_prob_val -  s.sum(), log_prob_val
 
 def build_model():
     x_1 = theano.tensor.matrix('x_1', dtype=theano.config.floatX)
@@ -132,6 +135,8 @@ def build_model():
 
     f_pred = theano.function([x_1, x_2], pred)
 
-    cost = log_loss(pred, params["s"])
+    cost, log_prob_val = log_loss(pred, params["s"])
 
-    return params, x_1, x_2, y, nice_input_1, nice_input_2, f_pred, cost
+    f_log_prob = theano.function([x_1, x_2], log_prob_val)
+
+    return params, x_1, x_2, y, nice_input_1, nice_input_2, f_pred, f_log_prob, cost
