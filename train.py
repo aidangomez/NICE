@@ -44,12 +44,58 @@ def adadelta(lr, tparams, grads, x_1, x_2, cost):
 
     return f_grad_shared, f_update
 
+def adam(loss, all_params, x_1, x_2, learning_rate=1e-3, b1=0.9, b2=0.01, e=1e-4, gamma=1-1e-8):
+    updates = []
+    all_grads = theano.grad(loss, all_params)
+    alpha = learning_rate
+    t = theano.shared(numpy.float32(1))
+    b1_t = b1*gamma**(t-1)   #(Decay the first moment running average coefficient)
+
+    for theta_previous, g in zip(all_params, all_grads):
+        m_previous = theano.shared(numpy.zeros(theta_previous.get_value().shape,
+                                            dtype=theano.config.floatX))
+        v_previous = theano.shared(numpy.zeros(theta_previous.get_value().shape,
+                                            dtype=theano.config.floatX))
+
+        m = b1_t*m_previous + (1 - b1_t)*g                             # (Update biased first moment estimate)
+        v = b2*v_previous + (1 - b2)*g**2                              # (Update biased second raw moment estimate)
+        m_hat = m / (1-b1**t)                                          # (Compute bias-corrected first moment estimate)
+        v_hat = v / (1-b2**t)                                          # (Compute bias-corrected second raw moment estimate)
+        theta = theta_previous - (alpha * m_hat) / (theano.tensor.sqrt(v_hat) + e) #(Update parameters)
+
+        updates.append((m_previous, m))
+        updates.append((v_previous, v))
+        updates.append((theta_previous, theta) )
+    updates.append((t, t + 1.))
+
+    f_update = theano.function([x_1, x_2], [], updates=updates,
+                               on_unused_input='ignore',
+                               name='adadelta_f_update')
+
+    return f_update
+
+
+def pred_error(f_pred_prob, x_1, x_2, iterator, verbose=False):
+    """
+    Just compute the error
+    f_pred: Theano fct computing the prediction
+    prepare_data: usual prepare_data for that dataset.
+    """
+    valid_err = 0
+    for _, valid_index in iterator:
+        pred = f_pred_prob(x_1[valid_index], x_2[valid_index])
+        valid_err += pred
+
+    valid_err = numpy_floatX(valid_err) / len(x_1)
+
+    return valid_err
+
 def train_nice(
-    max_epochs=1,  # The maximum number of epoch to run
+    max_epochs=3,  # The maximum number of epoch to run
     dispFreq=10,  # Display to stdout the training progress every N updates
-    validFreq=370,  # Compute the validation error after this number of update.
-    batch_size=16,  # The batch size during training.
-    lrate=0.0001,  # Learning rate for sgd (not used for adadelta and rmsprop)
+    validFreq=333,  # Compute the validation error after this number of update.
+    batch_size=40,  # The batch size during training.
+    lrate=0.001,  # Learning rate for sgd (not used for adadelta and rmsprop)
     valid_batch_size=64,  # The batch size used for validation/test set.
 
     # Parameter for extra option
@@ -70,7 +116,7 @@ def train_nice(
     print('Building model')
     # This create the initial parameters as numpy ndarrays.
     # Dict name (string) -> numpy ndarray
-    params, x_1, x_2, y, pred_input_1, pred_input_2, f_pred, cost = nice.build_model()
+    params, x_1, x_2, y, pred_input_1, pred_input_2, f_pred, f_log_prob, cost = nice.build_model()
 
     f_cost = theano.function([x_1, x_2], cost, name='f_cost')
     f_pred_input_1 = theano.function([y], pred_input_1, name="pred_input_1")
@@ -80,15 +126,13 @@ def train_nice(
     f_grad = theano.function([x_1, x_2], grads, name='f_grad')
 
     lr = theano.tensor.scalar(name='lr')
-    f_grad_shared, f_update = adadelta(lr, params, grads,
-                                        x_1, x_2, cost)
+    f_update = adam(cost, list(params.values()), x_1, x_2)#adadelta(lr, params, grads, x_1, x_2, cost)
+    f_grad_shared = f_cost
 
     print('Optimization')
 
-    kf_valid_1 = data.get_minibatches_idx(len(valid_gpu_1), valid_batch_size)
-    kf_valid_2 = data.get_minibatches_idx(len(valid_gpu_2), valid_batch_size)
-    kf_test_1 = data.get_minibatches_idx(len(test_gpu_1), valid_batch_size)
-    kf_test_2 = data.get_minibatches_idx(len(test_gpu_2), valid_batch_size)
+    kf_valid = data.get_minibatches_idx(len(valid_gpu_1), valid_batch_size)
+    kf_test = data.get_minibatches_idx(len(test_gpu_1), valid_batch_size)
 
     print("%d train examples" % len(train_gpu_1))
     print("%d valid examples" % len(valid_gpu_1))
@@ -119,42 +163,29 @@ def train_nice(
                 n_samples += x_1.shape[0]
 
                 cost = f_grad_shared(x_1, x_2)
-                f_update(lrate)
+                log_prob = f_log_prob(x_1, x_2)
+                f_update(x_1, x_2)
 
                 if numpy.isnan(cost) or numpy.isinf(cost):
                     print('bad cost detected: ', cost)
                     return 1., 1., 1.
 
                 if numpy.mod(uidx, dispFreq) == 0:
-                    print('Epoch ', eidx, 'Update ', uidx, 'Cost ', cost)
+                    print('Epoch ', eidx, 'Update ', uidx, 'Cost ', cost, 'Log Prob ', log_prob)
 
                 if numpy.mod(uidx, validFreq) == 0:
-                    use_noise.set_value(0.)
-                    train_err = pred_error(f_pred, prepare_data, train, kf)
-                    valid_err = pred_error(f_pred, prepare_data, valid,
+                    train_err = pred_error(f_log_prob, train_gpu_1, train_gpu_2, kf)
+                    valid_err = pred_error(f_log_prob, valid_gpu_1, valid_gpu_2,
                                            kf_valid)
-                    test_err = pred_error(f_pred, prepare_data, test, kf_test)
-
-                    history_errs.append([valid_err, test_err])
-
-                    if (best_p is None or
-                        valid_err <= numpy.array(history_errs)[:,
-                                                               0].min()):
-
-                        best_p = unzip(tparams)
-                        bad_counter = 0
+                    test_err = pred_error(f_log_prob, test_gpu_1, test_gpu_2, kf_test)
 
                     print( ('Train ', train_err, 'Valid ', valid_err,
                            'Test ', test_err) )
 
-                    if (len(history_errs) > patience and
-                        valid_err >= numpy.array(history_errs)[:-patience,
-                                                               0].min()):
-                        bad_counter += 1
-                        if bad_counter > patience:
-                            print('Early Stop!')
-                            estop = True
-                            break
+            y = numpy.random.logistic(size=[x_1.shape[0], x_1.shape[1]+x_2.shape[1]])
+            input_1 = f_pred_input_1(y)
+            input_2 = f_pred_input_2(y)
+            draw.plot_digits(data.recombine_data(input_1, input_2), "epoch_%d.png" % eidx)
 
             print('Seen %d samples' % n_samples)
 
@@ -164,30 +195,16 @@ def train_nice(
     except KeyboardInterrupt:
         print("Training interupted")
 
-    y = numpy.random.logistic(size=[x_1.shape[0], x_1.shape[1]+x_2.shape[1]])
-
-    input_1 = f_pred_input_1(y)
-    input_2 = f_pred_input_2(y)
-    draw.plot_digits(data.recombine_data(input_1, input_2))
-
     end_time = time.time()
-    if best_p is not None:
-        zipp(best_p, tparams)
-    else:
-        best_p = unzip(tparams)
 
-    use_noise.set_value(0.)
-    kf_train_sorted = get_minibatches_idx(len(train[0]), batch_size)
-    train_err = pred_error(f_pred, prepare_data, train, kf_train_sorted)
-    valid_err = pred_error(f_pred, prepare_data, valid, kf_valid)
-    test_err = pred_error(f_pred, prepare_data, test, kf_test)
+    kf_train_sorted = data.get_minibatches_idx(len(train_gpu_1), batch_size)
+    train_err = pred_error(f_log_prob, train_gpu_1, train_gpu_2, kf_train_sorted)
+    valid_err = pred_error(f_log_prob, valid_gpu_1, valid_gpu_2, kf_valid)
+    test_err = pred_error(f_log_prob, test_gpu_1, test_gpu_2, kf_test)
 
     print( 'Train ', train_err, 'Valid ', valid_err, 'Test ', test_err )
     print('The code run for %d epochs, with %f sec/epochs' % (
         (eidx + 1), (end_time - start_time) / (1. * (eidx + 1))))
-    print( ('Training took %.1fs' %
-            (end_time - start_time)), file=sys.stderr)
-
 
 
     return train_err, valid_err, test_err
