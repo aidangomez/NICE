@@ -1,7 +1,10 @@
 import theano
 import numpy
+
 import nice
 import data
+import draw
+
 from theano import config
 import time
 
@@ -42,7 +45,7 @@ def adadelta(lr, tparams, grads, x_1, x_2, cost):
     return f_grad_shared, f_update
 
 def train_nice(
-    max_epochs=5000,  # The maximum number of epoch to run
+    max_epochs=1,  # The maximum number of epoch to run
     dispFreq=10,  # Display to stdout the training progress every N updates
     validFreq=370,  # Compute the validation error after this number of update.
     batch_size=16,  # The batch size during training.
@@ -67,9 +70,11 @@ def train_nice(
     print('Building model')
     # This create the initial parameters as numpy ndarrays.
     # Dict name (string) -> numpy ndarray
-    params, x_1, x_2, f_pred, cost = nice.build_model()
+    params, x_1, x_2, y, pred_input_1, pred_input_2, f_pred, cost = nice.build_model()
 
     f_cost = theano.function([x_1, x_2], cost, name='f_cost')
+    f_pred_input_1 = theano.function([y], pred_input_1, name="pred_input_1")
+    f_pred_input_2 = theano.function([y], pred_input_2, name="pred_input_2")
 
     grads = theano.tensor.grad(cost, wrt=list(params.values()))
     f_grad = theano.function([x_1, x_2], grads, name='f_grad')
@@ -109,6 +114,7 @@ def train_nice(
                 # Select the random examples for this minibatch
                 x_1 = numpy.array([train_gpu_1[t]for t in train_index])
                 x_2 = numpy.array([train_gpu_2[t]for t in train_index])
+
 
                 n_samples += x_1.shape[0]
 
@@ -158,6 +164,12 @@ def train_nice(
     except KeyboardInterrupt:
         print("Training interupted")
 
+    y = numpy.random.logistic(size=[x_1.shape[0], x_1.shape[1]+x_2.shape[1]])
+
+    input_1 = f_pred_input_1(y)
+    input_2 = f_pred_input_2(y)
+    draw.plot_digits(data.recombine_data(input_1, input_2))
+
     end_time = time.time()
     if best_p is not None:
         zipp(best_p, tparams)
@@ -171,14 +183,13 @@ def train_nice(
     test_err = pred_error(f_pred, prepare_data, test, kf_test)
 
     print( 'Train ', train_err, 'Valid ', valid_err, 'Test ', test_err )
-    if saveto:
-        numpy.savez(saveto, train_err=train_err,
-                    valid_err=valid_err, test_err=test_err,
-                    history_errs=history_errs, **best_p)
     print('The code run for %d epochs, with %f sec/epochs' % (
         (eidx + 1), (end_time - start_time) / (1. * (eidx + 1))))
     print( ('Training took %.1fs' %
             (end_time - start_time)), file=sys.stderr)
+
+
+
     return train_err, valid_err, test_err
 
 if __name__ == '__main__':
