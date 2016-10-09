@@ -91,8 +91,8 @@ class ReLUMLPLayer:
         self.name = uuid4()
         self.input_size = input_size
         self.output_size = output_size
-        params[str(self.name)+"-W"] = theano.shared(0.01 * np.random.randn(input_size, output_size))
-        params[str(self.name)+"-b"] = theano.shared(np.zeros((output_size)))
+        params[str(self.name)+"-W"] = theano.shared(np.array(0.01 * np.random.randn(input_size, output_size), dtype=theano.config.floatX))
+        params[str(self.name)+"-b"] = theano.shared(np.zeros((output_size), dtype=theano.config.floatX))
 
     def __call__(self, inputs):
         ip = theano.tensor.dot(inputs, params[str(self.name)+"-W"]) + params[str(self.name)+"-b"]

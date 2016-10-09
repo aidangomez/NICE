@@ -182,7 +182,7 @@ def train_nice(
                     print( ('Train ', train_err, 'Valid ', valid_err,
                            'Test ', test_err) )
 
-            y = numpy.random.logistic(size=[x_1.shape[0], x_1.shape[1]+x_2.shape[1]])
+            y = numpy.array(numpy.random.logistic(size=[x_1.shape[0], x_1.shape[1]+x_2.shape[1]]), dtype=theano.config.floatX)
             input_1 = f_pred_input_1(y)
             input_2 = f_pred_input_2(y)
             draw.plot_digits(data.recombine_data(input_1, input_2), "epoch_%d.png" % eidx)
