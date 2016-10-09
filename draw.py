@@ -1,8 +1,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.pyplot import savefig
 
 
-def plot_digits(digit_array):
+def plot_digits(digit_array, save_path):
     """Visualizes each example in digit_array.
 
     Note: N is the number of examples
@@ -29,7 +30,7 @@ def plot_digits(digit_array):
         bottom_end = top_end + examples_per_class
         bottom_pane_digits = extract_digits(digit_array, bottom_start, bottom_end)
 
-        show_pane(top_pane_digits, bottom_pane_digits)
+        show_pane(top_pane_digits, bottom_pane_digits, save_path)
 
 
 def extract_digits(digit_array, start_index, end_index):
@@ -51,7 +52,7 @@ def extract_digit_pixels(digit_array, index):
     return digit_array[index].reshape(28, 28)
 
 
-def show_pane(top_digits, bottom_digits):
+def show_pane(top_digits, bottom_digits, save_path):
     """Displays two rows of digits on the screen.
     """
 
@@ -60,4 +61,4 @@ def show_pane(top_digits, bottom_digits):
     for axis, digit in zip(axes.reshape(-1), all_digits):
         axis.imshow(digit, interpolation='nearest', cmap=plt.gray())
         axis.axis('off')
-    plt.show()
+    savefig(save_path)
