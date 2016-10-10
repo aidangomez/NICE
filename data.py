@@ -1,6 +1,7 @@
 import pickle
 import gzip
 import numpy
+from collections import OrderedDict
 import theano
 
 
@@ -63,3 +64,9 @@ def get_minibatches_idx(n, minibatch_size, shuffle=True):
         minibatches.append(idx_list[minibatch_start:])
 
     return zip(range(len(minibatches)), minibatches)
+
+def unzip_params(params):
+    new_params = OrderedDict()
+    for kk, vv in params.items():
+        new_params[kk] = vv.get_value()
+    return new_params

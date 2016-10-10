@@ -1,5 +1,4 @@
 from collections import OrderedDict
-from uuid import uuid4
 
 import theano
 from theano.sandbox.rng_mrg import MRG_RandomStreams as RandomStreams
@@ -88,7 +87,7 @@ class CouplingLayer:
 
 class ReLUMLPLayer:
     def __init__(self, input_size, output_size):
-        self.name = uuid4()
+        self.name = "ReLUMLP-%d" % len(params)
         self.input_size = input_size
         self.output_size = output_size
         params[str(self.name)+"-W"] = theano.shared(np.array(0.01 * np.random.randn(input_size, output_size), dtype=theano.config.floatX))

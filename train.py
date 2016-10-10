@@ -119,8 +119,6 @@ def train_nice(
     params, x_1, x_2, y, pred_input_1, pred_input_2, f_pred, f_log_prob, cost = nice.build_model()
 
     f_cost = theano.function([x_1, x_2], cost, name='f_cost')
-    f_pred_input_1 = theano.function([y], pred_input_1, name="pred_input_1")
-    f_pred_input_2 = theano.function([y], pred_input_2, name="pred_input_2")
 
     grads = theano.tensor.grad(cost, wrt=list(params.values()))
     f_grad = theano.function([x_1, x_2], grads, name='f_grad')
@@ -146,7 +144,7 @@ def train_nice(
     estop = False  # early stop
     start_time = time.time()
 
-    numpy.savez("weights", **params)
+    numpy.savez_compressed("weights", **data.unzip_params(params))
 
     try:
         for eidx in range(max_epochs):
@@ -185,7 +183,7 @@ def train_nice(
                     print( ('Train ', train_err, 'Valid ', valid_err,
                            'Test ', test_err) )
 
-            numpy.savez("weights", **params)
+            numpy.savez_compressed("weights", **data.unzip_params(params))
 
             print('Seen %d samples' % n_samples)
 
