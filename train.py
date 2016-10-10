@@ -91,7 +91,7 @@ def pred_error(f_pred_prob, x_1, x_2, iterator, verbose=False):
     return valid_err
 
 def train_nice(
-    max_epochs=3,  # The maximum number of epoch to run
+    max_epochs=10,  # The maximum number of epoch to run
     dispFreq=10,  # Display to stdout the training progress every N updates
     validFreq=333,  # Compute the validation error after this number of update.
     batch_size=40,  # The batch size during training.
@@ -145,6 +145,9 @@ def train_nice(
     uidx = 0  # the number of update done
     estop = False  # early stop
     start_time = time.time()
+
+    numpy.savez("weights", **params)
+
     try:
         for eidx in range(max_epochs):
             n_samples = 0
@@ -182,15 +185,10 @@ def train_nice(
                     print( ('Train ', train_err, 'Valid ', valid_err,
                            'Test ', test_err) )
 
-            y = numpy.array(numpy.random.logistic(size=[x_1.shape[0], x_1.shape[1]+x_2.shape[1]]), dtype=theano.config.floatX)
-            input_1 = f_pred_input_1(y)
-            input_2 = f_pred_input_2(y)
-            draw.plot_digits(data.recombine_data(input_1, input_2), "epoch_%d.png" % eidx)
+            numpy.savez("weights", **params)
 
             print('Seen %d samples' % n_samples)
 
-            if estop:
-                break
 
     except KeyboardInterrupt:
         print("Training interupted")
