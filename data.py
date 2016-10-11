@@ -40,10 +40,10 @@ def partition_data(data):
     return data[:, 0::2], data[:, 1::2]
 
 def recombine_data(data_1, data_2):
-    output = numpy.zeros([data_1.shape[0], data_1.shape[1] + data_2.shape[1]])
-    output[:, 0::2] = data_1
-    output[:, 1::2] = data_2
-    
+    output = theano.tensor.zeros([data_1.shape[0], data_1.shape[1] + data_2.shape[1]], dtype=theano.config.floatX)
+    output = theano.tensor.set_subtensor(output[:, 0::2], data_1)
+    output = theano.tensor.set_subtensor(output[:, 1::2], data_2)
+
     return output
 
 def get_minibatches_idx(n, minibatch_size, shuffle=True):
