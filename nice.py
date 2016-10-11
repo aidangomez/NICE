@@ -127,9 +127,9 @@ def build_model():
     nice_stack = NICECombinationLayer([nice_1, nice_2, nice_3, nice_4])
 
     nice_output_1, nice_output_2 = nice_stack(x_1, x_2)
-    scaled_y = y / np.exp(params["s"])
-    nice_input_1, nice_input_2 = nice_stack.inverse(scaled_y[:, 0::2], scaled_y[:, 1::2])
-    output = theano.tensor.concatenate([nice_output_1, nice_output_2], axis=1)
+    scaled_y1, scaled_y2  = data.partition_data(y / np.exp(params["s"]))
+    nice_input_1, nice_input_2 = nice_stack.inverse(scaled_y1, scaled_y2)
+    output = data.recombine_data(nice_output_1, nice_output_2)
     pred = output * np.exp(params["s"])
 
     f_pred = theano.function([x_1, x_2], pred)
