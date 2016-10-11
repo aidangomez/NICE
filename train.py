@@ -1,12 +1,14 @@
+import time
+import sys
+
 import theano
+from theano import config
 import numpy
 
 import nice
 import data
 import draw
 
-from theano import config
-import time
 
 
 def numpy_floatX(data):
@@ -182,6 +184,8 @@ def train_nice(
 
                     print( ('Train ', train_err, 'Valid ', valid_err,
                            'Test ', test_err) )
+
+                sys.stdout.flush()
 
             numpy.savez_compressed("weights", **data.unzip_params(params))
 
