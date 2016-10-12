@@ -102,7 +102,7 @@ def log_prob(output):
     return -(np.log(1 + np.exp(output)) + np.log(1 + np.exp(-output))).sum()
 
 def log_loss(output, s):
-    log_prob_val = log_prob(output)
+    log_prob_val = log_prob(output) / output.shape[0]
     return -log_prob_val -  s.sum(), log_prob_val
 
 def build_model():

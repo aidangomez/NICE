@@ -83,12 +83,14 @@ def pred_error(f_pred_prob, x_1, x_2, iterator, verbose=False):
     f_pred: Theano fct computing the prediction
     prepare_data: usual prepare_data for that dataset.
     """
+    count = 0
     valid_err = 0
     for _, valid_index in iterator:
         pred = f_pred_prob(x_1[valid_index], x_2[valid_index])
         valid_err += pred
+        count += 1
 
-    valid_err = numpy_floatX(valid_err) / len(x_1)
+    valid_err = numpy_floatX(valid_err) / count
 
     return valid_err
 
@@ -131,8 +133,8 @@ def train_nice(
 
     print('Optimization')
 
-    kf_valid = data.get_minibatches_idx(len(valid_gpu_1), valid_batch_size)
-    kf_test = data.get_minibatches_idx(len(test_gpu_1), valid_batch_size)
+    kf_valid = list(data.get_minibatches_idx(len(valid_gpu_1), valid_batch_size))
+    kf_test = list(data.get_minibatches_idx(len(test_gpu_1), valid_batch_size))
 
     print("%d train examples" % len(train_gpu_1))
     print("%d valid examples" % len(valid_gpu_1))
@@ -147,7 +149,7 @@ def train_nice(
     start_time = time.time()
 
     numpy.savez_compressed("weights", **data.unzip_params(params))
-
+    best_error = float("Inf")
     try:
         for eidx in range(max_epochs):
             n_samples = 0
@@ -184,10 +186,13 @@ def train_nice(
 
                     print( ('Train ', train_err, 'Valid ', valid_err,
                            'Test ', test_err) )
+                    if test_err < best_error:
+                        best_error = test_err
+                        numpy.savez_compressed("weights", **data.unzip_params(params))
+
 
                 sys.stdout.flush()
 
-            numpy.savez_compressed("weights", **data.unzip_params(params))
 
             print('Seen %d samples' % n_samples)
 

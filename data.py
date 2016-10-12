@@ -11,7 +11,6 @@ def get_dataset():
     u.encoding = 'latin1'
     train_set, valid_set, test_set = u.load()
     f.close()
-    print(train_set[0].shape, train_set[1].shape)
 
     return train_set, valid_set, test_set
 
