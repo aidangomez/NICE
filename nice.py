@@ -99,11 +99,11 @@ class ReLUMLPLayer:
 
 
 def log_prob(output):
-    return -(np.log(1 + np.exp(output)) + np.log(1 + np.exp(-output))).sum()
+    return -(theano.tensor.log(1 + theano.tensor.exp(output)) + theano.tensor.log(1 + theano.tensor.exp(-output))).sum()
 
 def log_loss(output, s):
     log_prob_val = log_prob(output) / output.shape[0]
-    return -log_prob_val -  s.sum(), log_prob_val
+    return - log_prob_val - s.sum(), log_prob_val
 
 def build_model():
     x_1 = theano.tensor.matrix('x_1', dtype=theano.config.floatX)
@@ -127,14 +127,14 @@ def build_model():
     nice_stack = NICECombinationLayer([nice_1, nice_2, nice_3, nice_4])
 
     nice_output_1, nice_output_2 = nice_stack(x_1, x_2)
-    scaled_y1, scaled_y2  = data.partition_data(y / np.exp(params["s"]))
+    scaled_y1, scaled_y2  = data.partition_data(y / theano.tensor.exp(params["s"]**2))
     nice_input_1, nice_input_2 = nice_stack.inverse(scaled_y1, scaled_y2)
     output = data.recombine_data(nice_output_1, nice_output_2)
-    pred = output * np.exp(params["s"])
+    pred = output * theano.tensor.exp(params["s"]**2)
 
     f_pred = theano.function([x_1, x_2], pred)
 
-    cost, log_prob_val = log_loss(pred, params["s"])
+    cost, log_prob_val = log_loss(pred, params["s"]**2)
 
     f_log_prob = theano.function([x_1, x_2], log_prob_val)
 

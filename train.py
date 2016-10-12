@@ -46,12 +46,12 @@ def adadelta(lr, tparams, grads, x_1, x_2, cost):
 
     return f_grad_shared, f_update
 
-def adam(loss, all_params, x_1, x_2, learning_rate=1e-3, b1=0.9, b2=0.01, e=1e-4, gamma=1-1e-8):
+def adam(loss, all_params, x_1, x_2, learning_rate=1e-3, b1=0.9, b2=0.01, e=1e-4, lambda_var=1):
     updates = []
     all_grads = theano.grad(loss, all_params)
     alpha = learning_rate
     t = theano.shared(numpy.float32(1))
-    b1_t = b1*gamma**(t-1)   #(Decay the first moment running average coefficient)
+    b1_t = b1*lambda_var**(t-1)   #(Decay the first moment running average coefficient)
 
     for theta_previous, g in zip(all_params, all_grads):
         m_previous = theano.shared(numpy.zeros(theta_previous.get_value().shape,
@@ -149,7 +149,7 @@ def train_nice(
     start_time = time.time()
 
     numpy.savez_compressed("weights", **data.unzip_params(params))
-    best_error = float("Inf")
+    best_prob = -float("Inf")
     try:
         for eidx in range(max_epochs):
             n_samples = 0
@@ -179,17 +179,17 @@ def train_nice(
                     print('Epoch ', eidx, 'Update ', uidx, 'Cost ', cost, 'Log Prob ', log_prob)
 
                 if numpy.mod(uidx, validFreq) == 0:
-                    train_err = pred_error(f_log_prob, train_gpu_1, train_gpu_2, kf)
-                    valid_err = pred_error(f_log_prob, valid_gpu_1, valid_gpu_2,
+                    train_prob = pred_error(f_log_prob, train_gpu_1, train_gpu_2, kf)
+                    valid_prob = pred_error(f_log_prob, valid_gpu_1, valid_gpu_2,
                                            kf_valid)
-                    test_err = pred_error(f_log_prob, test_gpu_1, test_gpu_2, kf_test)
+                    test_prob = pred_error(f_log_prob, test_gpu_1, test_gpu_2, kf_test)
 
-                    print( ('Train ', train_err, 'Valid ', valid_err,
-                           'Test ', test_err) )
-                    if test_err < best_error:
-                        best_error = test_err
+                    print( ('Train ', train_prob, 'Valid ', valid_prob,
+                           'Test ', test_prob) )
+
+                    if test_prob > best_prob:
+                        best_prob = test_err
                         numpy.savez_compressed("weights", **data.unzip_params(params))
-
 
                 sys.stdout.flush()
 
