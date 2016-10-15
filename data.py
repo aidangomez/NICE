@@ -45,7 +45,7 @@ def recombine_data(data_1, data_2):
 
     return output
 
-def get_minibatches_idx(n, minibatch_size, shuffle=True):
+def get_minibatches_idx(n, minibatch_size, shuffle=False):
     idx_list = numpy.arange(n, dtype="int32")
 
     if shuffle:

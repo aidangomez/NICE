@@ -100,8 +100,8 @@ def pred_error(f_pred_prob, x_1, x_2, iterator, verbose=False):
     return valid_err
 
 def train_nice(
-    max_epochs=10,  # The maximum number of epoch to run
-    dispFreq=10,  # Display to stdout the training progress every N updates
+    max_epochs=1500,  # The maximum number of epoch to run
+    dispFreq=55,  # Display to stdout the training progress every N updates
     validFreq=330,  # Compute the validation error after this number of update.
     batch_size=40,  # The batch size during training.
     lrate=0.001,  # Learning rate for sgd (not used for adadelta and rmsprop)
