@@ -103,7 +103,7 @@ def log_prob(output):
 
 def log_loss(output, s):
     log_prob_val = log_prob(output) / output.shape[0]
-    return - log_prob_val - s.sum(), log_prob_val
+    return - log_prob_val - s.sum()
 
 def build_model():
     x_1 = theano.tensor.matrix('x_1', dtype=theano.config.floatX)
@@ -127,15 +127,13 @@ def build_model():
     nice_stack = NICECombinationLayer([nice_1, nice_2, nice_3, nice_4])
 
     nice_output_1, nice_output_2 = nice_stack(x_1, x_2)
-    scaled_y1, scaled_y2  = data.partition_data(y / theano.tensor.exp(params["s"]**2))
+    scaled_y1, scaled_y2  = data.partition_data(y / theano.tensor.exp(params["s"]))
     nice_input_1, nice_input_2 = nice_stack.inverse(scaled_y1, scaled_y2)
     output = data.recombine_data(nice_output_1, nice_output_2)
-    pred = output * theano.tensor.exp(params["s"]**2)
+    pred = output * theano.tensor.exp(params["s"])
 
     f_pred = theano.function([x_1, x_2], pred)
 
-    cost, log_prob_val = log_loss(pred, params["s"]**2)
+    cost = log_loss(pred, params["s"])
 
-    f_log_prob = theano.function([x_1, x_2], log_prob_val)
-
-    return params, x_1, x_2, y, nice_input_1, nice_input_2, f_pred, f_log_prob, cost
+    return params, x_1, x_2, y, nice_input_1, nice_input_2, f_pred, cost

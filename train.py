@@ -85,10 +85,15 @@ def pred_error(f_pred_prob, x_1, x_2, iterator, verbose=False):
     """
     count = 0
     valid_err = 0
+    preds = []
     for _, valid_index in iterator:
         pred = f_pred_prob(x_1[valid_index], x_2[valid_index])
+        preds.append((valid_index, pred))
         valid_err += pred
         count += 1
+
+    if valid_err > 0:
+        print(preds)
 
     valid_err = numpy_floatX(valid_err) / count
 
@@ -97,7 +102,7 @@ def pred_error(f_pred_prob, x_1, x_2, iterator, verbose=False):
 def train_nice(
     max_epochs=10,  # The maximum number of epoch to run
     dispFreq=10,  # Display to stdout the training progress every N updates
-    validFreq=333,  # Compute the validation error after this number of update.
+    validFreq=330,  # Compute the validation error after this number of update.
     batch_size=40,  # The batch size during training.
     lrate=0.001,  # Learning rate for sgd (not used for adadelta and rmsprop)
     valid_batch_size=64,  # The batch size used for validation/test set.
@@ -120,7 +125,7 @@ def train_nice(
     print('Building model')
     # This create the initial parameters as numpy ndarrays.
     # Dict name (string) -> numpy ndarray
-    params, x_1, x_2, y, pred_input_1, pred_input_2, f_pred, f_log_prob, cost = nice.build_model()
+    params, x_1, x_2, y, pred_input_1, pred_input_2, f_pred, cost = nice.build_model()
 
     f_cost = theano.function([x_1, x_2], cost, name='f_cost')
 
@@ -149,7 +154,7 @@ def train_nice(
     start_time = time.time()
 
     numpy.savez_compressed("weights", **data.unzip_params(params))
-    best_prob = -float("Inf")
+    best_prob = float("Inf")
     try:
         for eidx in range(max_epochs):
             n_samples = 0
@@ -164,11 +169,10 @@ def train_nice(
                 x_1 = numpy.array([train_gpu_1[t]for t in train_index])
                 x_2 = numpy.array([train_gpu_2[t]for t in train_index])
 
-
                 n_samples += x_1.shape[0]
 
                 cost = f_grad_shared(x_1, x_2)
-                log_prob = f_log_prob(x_1, x_2)
+
                 f_update(x_1, x_2)
 
                 if numpy.isnan(cost) or numpy.isinf(cost):
@@ -176,20 +180,23 @@ def train_nice(
                     return 1., 1., 1.
 
                 if numpy.mod(uidx, dispFreq) == 0:
-                    print('Epoch ', eidx, 'Update ', uidx, 'Cost ', cost, 'Log Prob ', log_prob)
+                    print('Epoch ', eidx, 'Update ', uidx, 'Cost ', cost)
 
                 if numpy.mod(uidx, validFreq) == 0:
-                    train_prob = pred_error(f_log_prob, train_gpu_1, train_gpu_2, kf)
-                    valid_prob = pred_error(f_log_prob, valid_gpu_1, valid_gpu_2,
+                    train_prob = pred_error(f_cost, train_gpu_1, train_gpu_2, kf)
+                    valid_prob = pred_error(f_cost, valid_gpu_1, valid_gpu_2,
                                            kf_valid)
-                    test_prob = pred_error(f_log_prob, test_gpu_1, test_gpu_2, kf_test)
+                    test_prob = pred_error(f_cost, test_gpu_1, test_gpu_2, kf_test)
 
                     print( ('Train ', train_prob, 'Valid ', valid_prob,
                            'Test ', test_prob) )
 
-                    if test_prob > best_prob:
-                        best_prob = test_err
+                    if valid_prob < best_prob:
+                        best_prob = valid_prob
                         numpy.savez_compressed("weights", **data.unzip_params(params))
+
+                    if test_prob > 0:
+                        print()
 
                 sys.stdout.flush()
 
@@ -203,9 +210,9 @@ def train_nice(
     end_time = time.time()
 
     kf_train_sorted = data.get_minibatches_idx(len(train_gpu_1), batch_size)
-    train_err = pred_error(f_log_prob, train_gpu_1, train_gpu_2, kf_train_sorted)
-    valid_err = pred_error(f_log_prob, valid_gpu_1, valid_gpu_2, kf_valid)
-    test_err = pred_error(f_log_prob, test_gpu_1, test_gpu_2, kf_test)
+    train_err = pred_error(f_cost, train_gpu_1, train_gpu_2, kf_train_sorted)
+    valid_err = pred_error(f_cost, valid_gpu_1, valid_gpu_2, kf_valid)
+    test_err = pred_error(f_cost, test_gpu_1, test_gpu_2, kf_test)
 
     print( 'Train ', train_err, 'Valid ', valid_err, 'Test ', test_err )
     print('The code run for %d epochs, with %f sec/epochs' % (
